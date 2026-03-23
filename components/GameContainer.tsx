@@ -866,7 +866,7 @@ const GameContainer: React.FC<{ onExit: () => void }> = ({ onExit }) => {
                 >
                   <img 
                     src={boxType === 'grandaxin90' ? box90Image : packImage} 
-                    alt={boxType === 'grandaxin90' ? 'Грандаксин 90 мг' : 'Pill Pack'} 
+                    alt={boxType === 'grandaxin90' ? 'Грандаксин, упаковка 90 таблеток' : 'Pill Pack'} 
                     draggable="false"
                     onDragStart={(e) => e.preventDefault()}
                     onError={() => setImgError(true)}
@@ -933,14 +933,14 @@ const GameContainer: React.FC<{ onExit: () => void }> = ({ onExit }) => {
         }}
       />
 
-      {/* Попап поверх игры: получена коробка Грандаксин 90 мг */}
+      {/* Попап поверх игры: получена упаковка Грандаксин 90 таблеток */}
       {showBonusPopup && (
         <div className="absolute inset-0 flex items-center justify-center p-4 z-50 bg-black/50 backdrop-blur-[2px]">
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xl max-w-[280px] w-full flex flex-col items-center text-center gap-4 animate-in zoom-in-95 duration-200">
             <h2 className="text-base font-black text-slate-800 tracking-tight leading-tight">
-              Поздравляем, вы получаете коробку Грандаксин<span className="align-super" style={{ fontFamily: 'Inter, system-ui, sans-serif', fontSize: '0.5em' }}>®</span> 90 мг
+              Поздравляем, вы получаете упаковку препарата Грандаксин<span className="align-super" style={{ fontFamily: 'Inter, system-ui, sans-serif', fontSize: '0.5em' }}>®</span> 90 таблеток
             </h2>
-            <img src={box90Image} alt="Грандаксин 90 мг" className="max-h-28 w-auto object-contain drop-shadow-md" />
+            <img src={box90Image} alt="Грандаксин, упаковка 90 таблеток" className="max-h-28 w-auto object-contain drop-shadow-md" />
             <button
               onClick={() => {
                 hasGrandaxin90UnlockedRef.current = true;
