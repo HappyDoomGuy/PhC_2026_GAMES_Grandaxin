@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { startSessionTracking } from './lib/sessionTracking';
 import GameContainer from './components/GameContainer';
 import blueImage from './blue.png';
 import greenImage from './green.png';
@@ -11,6 +12,10 @@ const App: React.FC = () => {
   const [checkbox1, setCheckbox1] = useState(false);
   const [checkbox2, setCheckbox2] = useState(false);
   const [sightTarget, setSightTarget] = useState(0);
+
+  useEffect(() => {
+    return startSessionTracking() ?? undefined;
+  }, []);
 
   useEffect(() => {
     if (isStarted || showDisclaimer) return;
