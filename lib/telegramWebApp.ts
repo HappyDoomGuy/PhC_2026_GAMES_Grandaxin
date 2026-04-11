@@ -13,6 +13,35 @@ export type TelegramWebAppUserLite = {
   username?: string;
 };
 
+/** Минимальный тип SDK для разворота на весь экран и отключения свайпа закрытия (как в demo.html). */
+type TelegramWebAppSdk = {
+  ready: () => void;
+  expand?: () => void;
+  disableVerticalSwipes?: () => void;
+  onEvent?: (event: string, handler: () => void) => void;
+};
+
+function getTelegramWebApp(): TelegramWebAppSdk | null {
+  if (typeof window === 'undefined') return null;
+  const w = window as Window & { Telegram?: { WebApp?: TelegramWebAppSdk } };
+  return w.Telegram?.WebApp ?? null;
+}
+
+let telegramLayoutEventsBound = false;
+
+/** Развернуть Mini App на всю высоту и отключить вертикальный свайп закрытия (Telegram 7.7+). */
+function applyTelegramMiniAppLayout(): void {
+  const WebApp = getTelegramWebApp();
+  if (!WebApp) return;
+  try {
+    WebApp.expand?.();
+    // В demo.html также выставлялся viewportStableHeight — в актуальном SDK поле часто только для чтения; expand достаточно
+    WebApp.disableVerticalSwipes?.();
+  } catch {
+    /* empty */
+  }
+}
+
 function getTelegramWebAppUser(): TelegramWebAppUserLite | null {
   if (typeof window === 'undefined') return null;
   const w = window as Window & {
@@ -50,9 +79,21 @@ function buildTelegramDisplayName(user: TelegramWebAppUserLite): string {
 
 /** Вызвать после загрузки telegram-web-app.js (например из index.tsx). */
 export function initTelegramWebAppIfPresent(): void {
+  const WebApp = getTelegramWebApp();
+  if (!WebApp) return;
   try {
-    const w = window as Window & { Telegram?: { WebApp?: { ready: () => void } } };
-    w.Telegram?.WebApp?.ready();
+    WebApp.ready();
+    applyTelegramMiniAppLayout();
+    if (!telegramLayoutEventsBound && WebApp.onEvent) {
+      telegramLayoutEventsBound = true;
+      const reapply = () => applyTelegramMiniAppLayout();
+      WebApp.onEvent('themeChanged', reapply);
+      try {
+        WebApp.onEvent('viewportChanged', reapply);
+      } catch {
+        /* не во всех версиях клиента */
+      }
+    }
   } catch {
     /* empty */
   }
