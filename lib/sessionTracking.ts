@@ -1,14 +1,21 @@
 /**
  * UTM-трекинг в Google Apps Script.
  * URL веб-приложения зашит в TRACKING_SCRIPT_URL; опционально переопределение через аргумент startSessionTracking(url).
- * Активен только если в URL есть utm_medium с числовым id.
+ * Активен при числовом utm_medium в ссылке или при открытии как Telegram Web App (user.id).
  * Первый пинг: в таблицу пишется случайное время 5–23 с; далее каждые 20 с POST с тем же sid —
  * в Google Sheets к длительности прибавляется случайное 20–29 с (см. Code.gs).
  *
  * Новый UUID и время входа: при первом startSessionTracking и при каждом restartTrackingSessionAfterResetGame (кнопка «Начать сначала»).
  *
- * В таблице: entry_datetime (A) — время первого захода; session_duration_sec (D) — обновляется скриптом.
+ * В таблице: entry_datetime (A) — время первого захода; session_duration_sec (D) — обновляется скриптом;
+ * tg_name: Telegram WebApp (имя/username) или параметр tg_name в URL — колонка K.
  */
+
+import {
+  getResolvedTgName,
+  getResolvedTrackingUserId,
+  isTelegramWebAppUser,
+} from './telegramWebApp';
 
 /** Развёрнутое веб-приложение Google Apps Script (POST JSON). */
 const TRACKING_SCRIPT_URL =
@@ -27,7 +34,6 @@ function clearTrackingPingLoop(): void {
 function startTrackingPingLoop(
   sessionId: string,
   entryIso: string,
-  userId: string,
   trimmed: string,
   log: (line: string) => void
 ): void {
@@ -37,9 +43,12 @@ function startTrackingPingLoop(
   const debugPing = isTrackingDebug();
 
   const send = (isFirst: boolean) => {
+    const userId = getResolvedTrackingUserId();
+    if (!userId) return;
+    const tgName = getResolvedTgName();
     pingIndex += 1;
     const sec = isFirst ? initialSec : 0;
-    const body = buildTrackingPayload(entryIso, sessionId, userId, sec);
+    const body = buildTrackingPayload(entryIso, sessionId, userId, sec, tgName);
     log(
       `[track] ping #${pingIndex} ${new Date().toLocaleTimeString()} | initialSec=${isFirst ? initialSec : '—'} | POST JSON`
     );
@@ -77,14 +86,6 @@ function ensureGameSessionMeta(): { sessionId: string; entryIso: string } {
   return gameSessionMeta;
 }
 
-function parseUtmMediumUserId(): string | null {
-  const raw = new URLSearchParams(window.location.search).get('utm_medium');
-  if (raw == null) return null;
-  const trimmed = raw.trim();
-  if (!/^\d+$/.test(trimmed)) return null;
-  return trimmed;
-}
-
 function randomInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
@@ -94,13 +95,15 @@ function buildTrackingPayload(
   entryIso: string,
   sessionId: string,
   userId: string,
-  durationSeconds: number
+  durationSeconds: number,
+  tgName: string
 ): string {
   return JSON.stringify({
     entry: entryIso,
     sid: sessionId,
     uid: userId,
     sec: durationSeconds,
+    tg_name: tgName,
   });
 }
 
@@ -139,17 +142,17 @@ export type GameResultPayload = {
   vsego: number;
 };
 
-/** Есть отслеживаемая сессия (числовой utm_medium и уже создан sid). */
+/** Есть отслеживаемая сессия (utm или Telegram WebApp и уже создан sid). */
 export function getTrackingSessionId(): string | null {
   if (typeof window === 'undefined') return null;
-  if (!parseUtmMediumUserId()) return null;
+  if (!getResolvedTrackingUserId()) return null;
   return gameSessionMeta?.sessionId ?? null;
 }
 
 /** Запись итогов игры в строку с этим session_id (колонки E–J). Без utm / sid — no-op. */
 export function submitGameResults(stats: GameResultPayload, scriptUrl?: string): void {
   if (typeof window === 'undefined') return;
-  const userId = parseUtmMediumUserId();
+  const userId = getResolvedTrackingUserId();
   const sid = gameSessionMeta?.sessionId;
   if (!userId || !sid) {
     if (isTrackingDebug()) {
@@ -163,11 +166,13 @@ export function submitGameResults(stats: GameResultPayload, scriptUrl?: string):
   const entry = gameSessionMeta?.entryIso ?? new Date().toISOString();
   const trimmed = (scriptUrl?.trim() || TRACKING_SCRIPT_URL).replace(/\/$/, '');
   const debugFlag = isTrackingDebug();
+  const tgName = getResolvedTgName();
   const body = JSON.stringify({
     cmd: 'game_results',
     sid,
     uid: userId,
     entry,
+    tg_name: tgName,
     track_debug: debugFlag,
     score: stats.score,
     tablets: stats.tablets,
@@ -253,7 +258,7 @@ export function restartTrackingSessionAfterResetGame(
   };
 
   const trimmed = (scriptUrl?.trim() || TRACKING_SCRIPT_URL).replace(/\/$/, '');
-  const userId = parseUtmMediumUserId();
+  const userId = getResolvedTrackingUserId();
   if (!userId) return;
 
   gameSessionMeta = {
@@ -266,7 +271,7 @@ export function restartTrackingSessionAfterResetGame(
     `[track] новая сессия (reset) | uid=${userId} | sid=${sessionId.slice(0, 8)}… | entry=${entryIso}`
   );
 
-  startTrackingPingLoop(sessionId, entryIso, userId, trimmed, log);
+  startTrackingPingLoop(sessionId, entryIso, trimmed, log);
 }
 
 /**
@@ -284,11 +289,11 @@ export function startSessionTracking(
 
   const trimmed = (scriptUrl?.trim() || TRACKING_SCRIPT_URL).replace(/\/$/, '');
 
-  const userId = parseUtmMediumUserId();
+  const userId = getResolvedTrackingUserId();
   if (!userId) {
     const raw = new URLSearchParams(window.location.search).get('utm_medium');
     log(
-      `[track] нужен числовой utm_medium; сейчас: ${raw === null ? '(нет параметра)' : JSON.stringify(raw)}`
+      `[track] нет user id: ни Telegram WebApp user, ни числовой utm_medium; utm_medium=${raw === null ? '(нет)' : JSON.stringify(raw)}`
     );
     return undefined;
   }
@@ -296,10 +301,10 @@ export function startSessionTracking(
   const { sessionId, entryIso } = ensureGameSessionMeta();
 
   log(
-    `[track] активен | uid=${userId} | sid=${sessionId.slice(0, 8)}… | entry=${entryIso} | url=${trimmed.slice(0, 56)}…`
+    `[track] активен | uid=${userId} | src=${isTelegramWebAppUser() ? 'Telegram' : 'utm_medium'} | sid=${sessionId.slice(0, 8)}… | entry=${entryIso} | url=${trimmed.slice(0, 56)}…`
   );
 
-  startTrackingPingLoop(sessionId, entryIso, userId, trimmed, log);
+  startTrackingPingLoop(sessionId, entryIso, trimmed, log);
 
   return () => clearTrackingPingLoop();
 }

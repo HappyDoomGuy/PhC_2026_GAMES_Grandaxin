@@ -3,6 +3,9 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import './comic-font.css';
 import faviconUrl from './blue.png';
+import { initTelegramWebAppIfPresent } from './lib/telegramWebApp';
+
+initTelegramWebAppIfPresent();
 
 function injectFaviconFromBundle(): void {
   let icon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');

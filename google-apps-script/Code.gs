@@ -4,15 +4,15 @@
  *
  * В таблице (первый лист): A — дата/время входа, B — session id (uuid),
  * C — user id из utm_medium, D — длительность сессии (сек),
- * E — score, F — tablets, G — тревога, H — нервозность, I — стресс, J — всего.
+ * E — score, F — tablets, G — тревога, H — нервозность, I — стресс, J — всего, K — tg_name.
  *
  * POST, тело JSON в e.postData.contents:
- *   { "entry": "<ISO>", "sid": "<uuid>", "uid": "<digits>", "sec": number }
+ *   { "entry": "<ISO>", "sid": "<uuid>", "uid": "<digits>", "sec": number, "tg_name": "..." (опционально) }
  *   sec > 0  — первая запись строки: записать sec как начальную длительность (клиент шлёт 5–23).
  *   sec === 0 — обновление: найти строку с sid в колонке B и прибавить к D случайное 20–29.
  *
  * Итог игры (экран game over):
- *   { "cmd": "game_results", "sid", "uid", "entry" (ISO), "score", "tablets", "trevoga", "nervoznost", "stress", "vsego" }
+ *   { "cmd": "game_results", "sid", "uid", "entry", "tg_name" (опц.), "score", … "vsego" }
  *   Если строки с таким sid ещё нет — добавляется новая строка (гонка с первым пингом).
  */
 var SPREADSHEET_ID = '1ooVI0IlhyeuB2IHqdM3bCRQ0mvuUGA-ynCAI5ww61W0';
@@ -51,6 +51,7 @@ function doPost(e) {
     var sid = String(data.sid || '');
     var uid = String(data.uid || '');
     var sec = Number(data.sec);
+    var tgName = normalizeTgName_(data.tg_name);
 
     if (!sid || !uid) {
       return jsonOut({ ok: false, error: 'sid and uid required' });
@@ -64,14 +65,17 @@ function doPost(e) {
         if (isNaN(curD0) || curD0 === 0) {
           d0.setValue(isNaN(sec) || sec < 0 ? 0 : sec);
         }
+        writeTgNameCellIfPresent_(sheet, rowFirst, tgName);
         return jsonOut({ ok: true, mode: 'prime_duration' });
       }
-      sheet.appendRow([formatEntry_(entry), sid, uid, sec]);
+      sheet.appendRow(trackingRowValues_(formatEntry_(entry), sid, uid, sec, tgName));
       return jsonOut({ ok: true, mode: 'append' });
     }
 
     var added = randomInt_(20, 29);
     var updated = updateDurationBySessionId_(sheet, sid, added);
+    var rowAfter = findRowBySessionId_(sheet, sid);
+    writeTgNameCellIfPresent_(sheet, rowAfter, tgName);
     return jsonOut({ ok: true, mode: 'update', added: added, rowFound: updated });
   } catch (err) {
     return jsonOut({ ok: false, error: String(err) });
@@ -101,8 +105,29 @@ var HEADER_ROW_ = [
   'тревога',
   'нервозность',
   'стресс',
-  'всего'
+  'всего',
+  'tg_name'
 ];
+
+/** Одна строка трекинга: A–D заполнены, E–J пустые, K — tg_name */
+function trackingRowValues_(entryCell, sid, uid, sec, tgName) {
+  return [entryCell, sid, uid, sec, '', '', '', '', '', '', tgName || ''];
+}
+
+function normalizeTgName_(v) {
+  var s = String(v != null ? v : '').trim();
+  if (s.length > 500) {
+    s = s.substring(0, 500);
+  }
+  return s;
+}
+
+function writeTgNameCellIfPresent_(sheet, rowNum, tgName) {
+  if (rowNum < 2 || !tgName) {
+    return;
+  }
+  sheet.getRange(rowNum, 11).setValue(tgName);
+}
 
 function ensureHeaders_(sheet) {
   if (sheet.getLastRow() < 1 || sheet.getRange('A1').getValue() === '') {
@@ -134,6 +159,7 @@ function handleGameResults_(sheet, data) {
   }
   var uid = String(data.uid || '').trim();
   var entryRaw = String(data.entry || '').trim();
+  var tgNameGr = normalizeTgName_(data.tg_name);
   var score = Number(data.score);
   var tablets = Number(data.tablets);
   var trevoga = Number(data.trevoga);
@@ -161,7 +187,7 @@ function handleGameResults_(sheet, data) {
       return jsonOut(e3);
     }
     var entryCell = entryRaw ? formatEntry_(entryRaw) : formatEntry_(new Date().toISOString());
-    sheet.appendRow([entryCell, sid, uid, 0, score, tablets, trevoga, nervoznost, stress, vsego]);
+    sheet.appendRow([entryCell, sid, uid, 0, score, tablets, trevoga, nervoznost, stress, vsego, tgNameGr]);
     var r = sheet.getLastRow();
     if (dbg) {
       Logger.log('game_results append row=' + r + ' sid=' + sid.slice(0, 12));
@@ -175,8 +201,9 @@ function handleGameResults_(sheet, data) {
   }
   // getRange(row, col, numRows, numColumns) — не «конечная ячейка»; иначе получается rowNum строк × 10 столбцов
   sheet.getRange(rowNum, 5, 1, 6).setValues([[score, tablets, trevoga, nervoznost, stress, vsego]]);
+  writeTgNameCellIfPresent_(sheet, rowNum, tgNameGr);
   if (dbg) {
-    Logger.log('game_results update row=' + rowNum + ' E–J');
+    Logger.log('game_results update row=' + rowNum + ' E–J, K if tg_name');
   }
   return jsonOut({
     ok: true,
