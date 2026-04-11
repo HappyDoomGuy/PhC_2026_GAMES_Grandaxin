@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { startSessionTracking } from './lib/sessionTracking';
+import { getResolvedTrackingUserId, getResolvedTgName } from './lib/telegramWebApp';
 import GameContainer from './components/GameContainer';
+import RecordsModal from './components/RecordsModal';
 import blueImage from './blue.png';
 import greenImage from './green.png';
 import redImage from './red.png';
@@ -13,6 +15,7 @@ const App: React.FC = () => {
   const [checkbox2, setCheckbox2] = useState(false);
   const [sightTarget, setSightTarget] = useState(0);
   const [trackDebugLines, setTrackDebugLines] = useState<string[]>([]);
+  const [showRecords, setShowRecords] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -227,12 +230,33 @@ const App: React.FC = () => {
               </h1>
             </div>
 
-            <div className="relative group cursor-pointer w-full max-w-[180px] mx-auto" onClick={handleStartClick}>
-               <div className="absolute -inset-1 bg-blue-500 rounded-2xl blur opacity-25 group-hover:opacity-60 transition duration-1000"></div>
-               <button className="relative w-full py-1.5 text-white rounded-2xl font-black transition-all active:scale-95 attention-pulse overflow-hidden" style={{ fontFamily: "'Comic CAT', sans-serif", backgroundColor: '#0083C1', fontSize: '28px' }}>
-                  <span className="absolute inset-0 shimmer-run pointer-events-none z-0" style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)', width: '40%' }} />
+            <div className="w-full max-w-[180px] mx-auto flex flex-col items-stretch gap-3">
+              <div className="relative group w-full">
+                <div className="absolute -inset-1 bg-blue-500 rounded-2xl blur opacity-25 group-hover:opacity-60 transition duration-1000 pointer-events-none" />
+                <button
+                  type="button"
+                  onClick={handleStartClick}
+                  className="relative w-full py-1.5 text-white rounded-2xl font-black transition-all active:scale-95 attention-pulse overflow-hidden"
+                  style={{ fontFamily: "'Comic CAT', sans-serif", backgroundColor: '#0083C1', fontSize: '28px' }}
+                >
+                  <span
+                    className="absolute inset-0 shimmer-run pointer-events-none z-0"
+                    style={{
+                      background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)',
+                      width: '40%',
+                    }}
+                  />
                   <span className="relative z-10">СТАРТ</span>
-               </button>
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowRecords(true)}
+                className="w-full py-1.5 rounded-2xl font-black transition-all active:scale-95 border-2 border-[#0083C1] text-[#0083C1] bg-white/90 shadow-md"
+                style={{ fontFamily: "'Comic CAT', sans-serif", fontSize: '22px' }}
+              >
+                Рекорды
+              </button>
             </div>
 
             <div className="text-center">
@@ -246,6 +270,15 @@ const App: React.FC = () => {
         {/* Игровой экран */}
         {isStarted && !showDisclaimer && (
           <GameContainer onExit={() => setIsStarted(false)} />
+        )}
+
+        {!isStarted && !showDisclaimer && (
+          <RecordsModal
+            open={showRecords}
+            onClose={() => setShowRecords(false)}
+            uid={getResolvedTrackingUserId()}
+            localDisplayName={getResolvedTgName()}
+          />
         )}
       </div>
     </div>

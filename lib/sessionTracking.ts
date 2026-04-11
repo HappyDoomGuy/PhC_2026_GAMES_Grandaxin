@@ -1,28 +1,76 @@
 /**
  * UTM-трекинг в Google Apps Script.
- * URL веб-приложения зашит в TRACKING_SCRIPT_URL; опционально переопределение через аргумент startSessionTracking(url).
+ * URL: `lib/trackingScriptUrl.ts` (TRACKING_SCRIPT_URL); опционально переопределение через аргумент startSessionTracking(url).
  * Активен при числовом utm_medium в ссылке или при открытии как Telegram Web App (user.id).
  * Первый пинг: в таблицу пишется случайное время 5–23 с; далее каждые 20 с POST с тем же sid —
  * в Google Sheets к длительности прибавляется случайное 20–29 с (см. Code.gs).
  *
  * Новый UUID и время входа: при первом startSessionTracking и при каждом restartTrackingSessionAfterResetGame (кнопка «Начать сначала»).
  *
- * В таблице: entry_datetime (A) — время первого захода; session_duration_sec (D) — обновляется скриптом;
- * tg_name: Telegram WebApp (имя/username) или параметр tg_name в URL — колонка K.
+ * В таблице: entry_datetime (A) — время первого захода; session_duration_sec (D) — обновляется скриптом; имя — лист «Профили» в GAS, не колонка K.
+ * tg_name: если в таблице уже есть имя для этого uid — оно (и с сервера подтягивается при старте); иначе Telegram WebApp или tg_name в URL.
  */
 
+import { fetchStoredTgName } from './recordsApi';
+import { TRACKING_SCRIPT_URL } from './trackingScriptUrl';
 import {
   getResolvedTgName,
   getResolvedTrackingUserId,
   isTelegramWebAppUser,
 } from './telegramWebApp';
 
-/** Развёрнутое веб-приложение Google Apps Script (POST JSON). */
-const TRACKING_SCRIPT_URL =
-  'https://script.google.com/macros/s/AKfycbzKN_fQP9hDXU4jWRegTrYGRSu4-kao04qtNaDhjKiEDdCA5t5wHNWP2SXAlsqL8AVH4w/exec';
+export { TRACKING_SCRIPT_URL } from './trackingScriptUrl';
 
 let gameSessionMeta: { sessionId: string; entryIso: string } | null = null;
 let trackingIntervalId: ReturnType<typeof window.setInterval> | null = null;
+
+/** После успешного `stored_tg_name` / смены имени в рекордах: непустое — брать вместо URL/Telegram. */
+let displayNameHydratedUid: string | null = null;
+/** '' = в таблице имени ещё нет; непустая строка = сохранённое имя. */
+let displayNameFromServer: string | undefined = undefined;
+
+/**
+ * Подтянуть имя из таблицы по uid. Если для id уже есть tg_name в любой строке — дальше оно же уходит в пинги.
+ */
+export async function hydrateStoredDisplayNameFromServer(): Promise<void> {
+  const uid = getResolvedTrackingUserId();
+  if (!uid) {
+    displayNameHydratedUid = null;
+    displayNameFromServer = undefined;
+    return;
+  }
+  try {
+    const s = await fetchStoredTgName(uid);
+    displayNameHydratedUid = uid;
+    displayNameFromServer = s;
+  } catch {
+    displayNameHydratedUid = uid;
+    displayNameFromServer = '';
+  }
+}
+
+/** После сохранения имени в рекордах — сразу обновить локальный кэш для пингов и game_results. */
+export function setCachedDisplayNameFromUser(name: string): void {
+  const uid = getResolvedTrackingUserId();
+  if (!uid) return;
+  const t = name.trim();
+  if (!t) return;
+  displayNameHydratedUid = uid;
+  displayNameFromServer = t.length > 500 ? t.slice(0, 500) : t;
+}
+
+function getTgNameForTracking(): string {
+  const uid = getResolvedTrackingUserId();
+  if (!uid) return '';
+  if (
+    displayNameHydratedUid === uid &&
+    displayNameFromServer != null &&
+    displayNameFromServer !== ''
+  ) {
+    return displayNameFromServer;
+  }
+  return getResolvedTgName();
+}
 
 function clearTrackingPingLoop(): void {
   if (trackingIntervalId !== null) {
@@ -45,7 +93,7 @@ function startTrackingPingLoop(
   const send = (isFirst: boolean) => {
     const userId = getResolvedTrackingUserId();
     if (!userId) return;
-    const tgName = getResolvedTgName();
+    const tgName = getTgNameForTracking();
     pingIndex += 1;
     const sec = isFirst ? initialSec : 0;
     const body = buildTrackingPayload(entryIso, sessionId, userId, sec, tgName);
@@ -166,7 +214,7 @@ export function submitGameResults(stats: GameResultPayload, scriptUrl?: string):
   const entry = gameSessionMeta?.entryIso ?? new Date().toISOString();
   const trimmed = (scriptUrl?.trim() || TRACKING_SCRIPT_URL).replace(/\/$/, '');
   const debugFlag = isTrackingDebug();
-  const tgName = getResolvedTgName();
+  const tgName = getTgNameForTracking();
   const body = JSON.stringify({
     cmd: 'game_results',
     sid,
@@ -304,7 +352,16 @@ export function startSessionTracking(
     `[track] активен | uid=${userId} | src=${isTelegramWebAppUser() ? 'Telegram' : 'utm_medium'} | sid=${sessionId.slice(0, 8)}… | entry=${entryIso} | url=${trimmed.slice(0, 56)}…`
   );
 
-  startTrackingPingLoop(sessionId, entryIso, trimmed, log);
+  let cancelled = false;
+  const start = () => {
+    if (!cancelled) {
+      startTrackingPingLoop(sessionId, entryIso, trimmed, log);
+    }
+  };
+  void hydrateStoredDisplayNameFromServer().then(start).catch(start);
 
-  return () => clearTrackingPingLoop();
+  return () => {
+    cancelled = true;
+    clearTrackingPingLoop();
+  };
 }
