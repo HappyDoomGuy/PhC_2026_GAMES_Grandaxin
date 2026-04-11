@@ -8,6 +8,7 @@ import box90Image from '../90.png';
 import bonusImage from '../bonus.png';
 import infoImage from '../info.png';
 import backIconImage from '../backicon.png';
+import { restartTrackingSessionAfterResetGame, submitGameResults } from '../lib/sessionTracking';
 
 // Image paths mapping
 const imagePaths: { [key: string]: string } = {
@@ -87,6 +88,8 @@ const GameContainer: React.FC<{ onExit: () => void }> = ({ onExit }) => {
   const bonusImageRef = useRef<HTMLImageElement | null>(null);
 
   const showBonusPopupRef = useRef(false);
+  const gameResultsSentRef = useRef(false);
+
   useEffect(() => {
     scoreRef.current = score;
     levelRef.current = level;
@@ -211,7 +214,32 @@ const GameContainer: React.FC<{ onExit: () => void }> = ({ onExit }) => {
     setBoxOffsetX(0);
     setTotalPillsUsed(0);
     setSymptomsEliminated({ blue: 0, green: 0, red: 0 });
+    gameResultsSentRef.current = false;
+    restartTrackingSessionAfterResetGame();
   };
+
+  useEffect(() => {
+    if (!gameOver || gameResultsSentRef.current) return;
+    gameResultsSentRef.current = true;
+    const trevoga = symptomsEliminated.blue;
+    const nervoznost = symptomsEliminated.green;
+    const stress = symptomsEliminated.red;
+    submitGameResults({
+      score,
+      tablets: totalPillsUsed,
+      trevoga,
+      nervoznost,
+      stress,
+      vsego: trevoga + nervoznost + stress,
+    });
+  }, [
+    gameOver,
+    score,
+    totalPillsUsed,
+    symptomsEliminated.blue,
+    symptomsEliminated.green,
+    symptomsEliminated.red,
+  ]);
 
   const playSound = (type: 'shoot' | 'pop' | 'bossHit' | 'leak' | 'reload') => {
     try {

@@ -12,6 +12,20 @@ const App: React.FC = () => {
   const [checkbox1, setCheckbox1] = useState(false);
   const [checkbox2, setCheckbox2] = useState(false);
   const [sightTarget, setSightTarget] = useState(0);
+  const [trackDebugLines, setTrackDebugLines] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get('track_debug') !== '1') return;
+    setTrackDebugLines(['[track_debug=1] отладка трекинга; см. также консоль и window.__TRACK_DEBUG_LOG__']);
+    const onLine = (ev: Event) => {
+      const ce = ev as CustomEvent<string>;
+      setTrackDebugLines((prev) => [...prev.slice(-24), ce.detail]);
+    };
+    window.addEventListener('track-debug', onLine);
+    return () => window.removeEventListener('track-debug', onLine);
+  }, []);
 
   useEffect(() => {
     return startSessionTracking() ?? undefined;
@@ -43,6 +57,14 @@ const App: React.FC = () => {
 
   return (
     <div className="w-full h-full overflow-hidden bg-[#05070a] text-slate-100 flex items-center justify-center" style={{ height: 'calc(var(--vh, 1vh) * 100)', minHeight: 0 }}>
+      {trackDebugLines.length > 0 && (
+        <div
+          className="fixed bottom-0 left-0 right-0 z-[100] max-h-[30vh] overflow-y-auto p-2 text-[10px] font-mono text-left bg-black/85 text-amber-200 border-t border-amber-700/50 whitespace-pre-wrap break-all pointer-events-none"
+          aria-hidden
+        >
+          {trackDebugLines.join('\n')}
+        </div>
+      )}
       {/* Mobile-first Container: Forces portrait aspect ratio on desktop */}
       <div className="relative h-full w-full max-w-[500px] aspect-[9/16] bg-[#0a0f1e] shadow-2xl overflow-hidden shadow-blue-900/20">
         <style>{`
