@@ -1,8 +1,6 @@
 @font-face {
   font-family: 'Comic CAT';
-  src: url('/fonts/Comic_CAT.otf') format('opentype');
+  src: url('./Comic CAT/Comic_CAT.otf') format('opentype');
   font-weight: normal;
   font-style: normal;
 }
-
-/* app */
