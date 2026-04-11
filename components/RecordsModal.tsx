@@ -25,36 +25,31 @@ const TABS: TabDef[] = [
     id: 'score',
     label: 'Очки',
     title: 'Очки',
-    description:
-      'Сумма набранных очков за все завершённые игровые сессии (после экрана со счётом). Чем выше сумма, тем выше место в рейтинге.',
+    description: 'Сумма очков за все завершённые игровые сессии.',
   },
   {
     id: 'symptoms',
     label: 'Симптомы',
     title: 'Побеждённые симптомы',
-    description:
-      'Суммарное количество побеждённых симптомов по показателю «всего» из итога каждой завершённой игры. Учитываются только завершённые сессии.',
+    description: 'Количество побеждённых симптомов за все завершённые игровые сессии.',
   },
   {
     id: 'tablets',
     label: 'Таблетки',
-    title: 'Использованные таблетки',
-    description:
-      'Суммарное количество использованных таблеток по всем завершённым сессиям. Накопительный показатель за всё время.',
+    title: 'Таблетки',
+    description: 'Количество использованных таблеток за все завершённые игровые сессии.',
   },
   {
     id: 'sessions',
     label: 'Сессии',
-    title: 'Игровые сессии',
-    description:
-      'Число всех заходов в игру по строкам учёта: и завершённых, и незавершённых (каждая строка с вашим id и номером сессии считается отдельно).',
+    title: 'Сессии',
+    description: 'Общее количество игровых сессий.',
   },
   {
     id: 'time',
     label: 'Время',
-    title: 'Время в игре',
-    description:
-      'Суммарная длительность по колонке «длительность сессии» для всех ваших строк учёта — и завершённых, и незавершённых. Показано в удобном виде.',
+    title: 'Время',
+    description: 'Общая продолжительность всех игровых сессий.',
   },
 ];
 
@@ -153,6 +148,7 @@ const RecordsModal: React.FC<Props> = ({ open, onClose, uid, localDisplayName })
   const [nameDraft, setNameDraft] = useState('');
   const [nameSaving, setNameSaving] = useState(false);
   const [nameFeedback, setNameFeedback] = useState<string | null>(null);
+  const [nameEditOpen, setNameEditOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -172,16 +168,17 @@ const RecordsModal: React.FC<Props> = ({ open, onClose, uid, localDisplayName })
     if (!open) return;
     setTab('score');
     setNameFeedback(null);
+    setNameEditOpen(false);
     setData(null);
     void hydrateStoredDisplayNameFromServer();
     void load();
   }, [open, load]);
 
   useEffect(() => {
-    if (!data || !open) return;
+    if (!data || !open || nameEditOpen) return;
     const fromTable = (data.score.me?.tgName || '').trim();
     setNameDraft(fromTable || localDisplayName.trim());
-  }, [data, open, localDisplayName]);
+  }, [data, open, localDisplayName, nameEditOpen]);
 
   if (!open) return null;
 
@@ -211,7 +208,8 @@ const RecordsModal: React.FC<Props> = ({ open, onClose, uid, localDisplayName })
       setCachedDisplayNameFromUser(t);
       await hydrateStoredDisplayNameFromServer();
       await load();
-      setNameFeedback('Сохранено: обновлён лист «Профили».');
+      setNameEditOpen(false);
+      setNameFeedback('Сохранено.');
     } catch (e) {
       setNameFeedback(e instanceof Error ? e.message : 'Не удалось сохранить');
     } finally {
@@ -225,191 +223,251 @@ const RecordsModal: React.FC<Props> = ({ open, onClose, uid, localDisplayName })
   const meLabel =
     me && (me.tgName?.trim() || localDisplayName?.trim() || (uid ? `id ${uid}` : 'Гость'));
 
+  const resolvedDisplayName = uid
+    ? loading && !data
+      ? localDisplayName.trim() || '…'
+      : (data?.score.me?.tgName || '').trim() || localDisplayName.trim() || `id ${uid}`
+    : '';
+
+  const openNameEditor = () => {
+    const fromTable = (data?.score.me?.tgName || '').trim();
+    setNameDraft(fromTable || localDisplayName.trim() || '');
+    setNameFeedback(null);
+    setNameEditOpen(true);
+  };
+
+  const cancelNameEdit = () => {
+    const fromTable = (data?.score.me?.tgName || '').trim();
+    setNameDraft(fromTable || localDisplayName.trim());
+    setNameFeedback(null);
+    setNameEditOpen(false);
+  };
+
+  const gapLine = data && cat && uid && me ? gapFootnote(tab, cat, localDisplayName) : null;
+
   return (
     <div
-      className="absolute inset-0 z-[60] flex flex-col overflow-hidden"
-      style={{ background: 'linear-gradient(180deg, #FFFFFF 0%, #75C4E6 100%)' }}
+      className="absolute inset-0 z-[60] flex flex-col overflow-hidden text-slate-800"
+      style={{
+        background: 'linear-gradient(168deg, #f8fafc 0%, #e8f4fc 38%, #b8dff0 72%, #89c9e8 100%)',
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.85)',
+      }}
       role="dialog"
       aria-modal
       aria-labelledby="records-title"
     >
-      <div className="flex items-center justify-between gap-2 px-4 pt-4 pb-2 flex-shrink-0">
-        <h2 id="records-title" className="text-lg font-black text-slate-800 uppercase tracking-tight">
-          Рекорды
-        </h2>
-        <button
-          type="button"
-          onClick={onClose}
-          className="px-3 py-1.5 rounded-xl text-sm font-bold text-slate-700 bg-white/90 border border-slate-200 shadow-sm active:scale-95"
-        >
-          Закрыть
-        </button>
-      </div>
-
-      <div className="px-3 pb-2 flex gap-1 overflow-x-auto flex-shrink-0 scrollbar-thin">
-        {TABS.map((t) => (
+      <header className="flex-shrink-0 px-4 pt-3 pb-3 border-b border-slate-200/60 bg-white/70 backdrop-blur-sm">
+        <div className="flex items-center justify-between gap-3">
+          <h2
+            id="records-title"
+            className="text-xl font-black tracking-tight text-slate-900"
+            style={{ fontFamily: "'Comic CAT', sans-serif" }}
+          >
+            Рекорды
+          </h2>
           <button
-            key={t.id}
             type="button"
-            onClick={() => setTab(t.id)}
-            className={`flex-shrink-0 px-2.5 py-1.5 rounded-xl text-xs font-bold border transition-colors ${
-              tab === t.id
-                ? 'bg-[#0083C1] text-white border-[#0083C1]'
-                : 'bg-white/80 text-slate-700 border-slate-200'
-            }`}
+            onClick={onClose}
+            className="shrink-0 rounded-full px-4 py-2 text-sm font-bold text-slate-600 bg-white border border-slate-200/90 shadow-sm hover:bg-slate-50 active:scale-[0.98] transition"
           >
-            {t.label}
+            Назад
           </button>
-        ))}
-      </div>
+        </div>
 
-      <div className="flex-1 min-h-0 relative min-h-[120px]">
-        {loading && (
-          <div
-            className="absolute inset-0 z-20 flex flex-col items-center justify-center px-6"
-            style={{
-              background: 'linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(117,196,230,0.55) 100%)',
-            }}
-            aria-busy
-            aria-live="polite"
-          >
-            <div className="relative h-14 w-14">
-              <div
-                className="absolute inset-0 rounded-full opacity-30"
-                style={{ border: '4px solid #0083C1' }}
-              />
-              <div
-                className="absolute inset-0 rounded-full animate-spin"
-                style={{
-                  border: '4px solid transparent',
-                  borderTopColor: '#0083C1',
-                  borderRightColor: '#0083C1',
-                }}
-              />
-            </div>
-            <p className="mt-5 text-sm font-bold text-slate-700 tracking-tight">Загрузка рекордов…</p>
-            <p className="mt-1 text-xs text-slate-500">Подождите несколько секунд</p>
-          </div>
-        )}
-
-        <div className="absolute inset-0 overflow-y-auto px-4 pb-4">
-          <div className="mb-3 rounded-2xl bg-white/85 border border-slate-200/80 shadow-sm px-3 py-3">
-            <h3 className="text-base font-black text-slate-800 leading-tight">{activeTab.title}</h3>
-            <p className="text-sm text-slate-600 mt-2 leading-relaxed">{activeTab.description}</p>
-          </div>
-
-          {!uid && (
-            <p className="text-sm text-slate-700 mb-3 rounded-xl bg-amber-50 border border-amber-200/80 px-3 py-2">
-              Чтобы увидеть своё место в рейтинге, откройте игру из Telegram или по ссылке с параметром{' '}
-              <span className="font-mono text-xs">utm_medium</span> (числовой id).
-            </p>
-          )}
-
-          {uid && data && !loading && (
-            <div className="mb-3 rounded-2xl bg-white/90 border border-slate-200/80 shadow-md px-3 py-3 space-y-2">
-              <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide">Имя в рейтинге</h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Имя в <span className="font-semibold text-slate-800">«Профили»</span> (одна запись на id): при первом
-                пинге оно берётся из Telegram или ссылки <span className="font-semibold text-slate-800">как есть</span>.
-                Смена здесь: не короче <span className="font-semibold text-slate-800">4 символов</span> и без мата и
-                грубых оскорблений по словарю.
-              </p>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        {uid && (
+          <div className="mt-3 rounded-xl bg-slate-50/90 border border-slate-200/80 px-3 py-2.5">
+            {!nameEditOpen ? (
+              <div className="flex items-center justify-between gap-3 min-w-0">
+                <p className="text-[15px] font-semibold text-slate-900 truncate min-w-0">{resolvedDisplayName}</p>
+                <button
+                  type="button"
+                  onClick={openNameEditor}
+                  disabled={loading || !data}
+                  className="shrink-0 text-sm font-bold text-[#0083C1] hover:text-[#006fa3] disabled:opacity-40 disabled:pointer-events-none underline-offset-2 hover:underline"
+                >
+                  Сменить имя
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
                 <input
                   type="text"
                   value={nameDraft}
                   onChange={(e) => setNameDraft(e.target.value)}
                   maxLength={500}
-                  placeholder={localDisplayName.trim() || 'Ваше имя'}
-                  className="flex-1 min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-inner focus:border-[#0083C1] focus:outline-none focus:ring-1 focus:ring-[#0083C1]"
+                  placeholder="Имя"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-[#0083C1] focus:outline-none focus:ring-2 focus:ring-[#0083C1]/25"
                   disabled={nameSaving}
                   autoComplete="nickname"
+                  autoFocus
                 />
-                <button
-                  type="button"
-                  onClick={() => void saveDisplayName()}
-                  disabled={nameSaving}
-                  className="flex-shrink-0 rounded-xl bg-[#0083C1] px-4 py-2 text-sm font-black text-white shadow-md transition active:scale-[0.98] disabled:opacity-50"
-                  style={{ fontFamily: "'Comic CAT', sans-serif" }}
-                >
-                  {nameSaving ? '…' : 'Сохранить'}
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void saveDisplayName()}
+                    disabled={nameSaving}
+                    className="rounded-lg bg-[#0083C1] px-4 py-2 text-sm font-black text-white shadow-md hover:opacity-95 active:scale-[0.98] disabled:opacity-50"
+                    style={{ fontFamily: "'Comic CAT', sans-serif" }}
+                  >
+                    {nameSaving ? '…' : 'Сохранить'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelNameEdit}
+                    disabled={nameSaving}
+                    className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Отмена
+                  </button>
+                </div>
+                {nameFeedback && (
+                  <p
+                    className={`text-xs ${nameFeedback.startsWith('Сохранено') ? 'text-emerald-700' : 'text-red-600'}`}
+                  >
+                    {nameFeedback}
+                  </p>
+                )}
               </div>
-              {nameFeedback && (
-                <p
-                  className={`text-xs ${nameFeedback.startsWith('Сохранено') ? 'text-emerald-700' : 'text-red-600'}`}
-                >
-                  {nameFeedback}
-                </p>
-              )}
+            )}
+          </div>
+        )}
+      </header>
+
+      <nav className="flex-shrink-0 px-3 pt-2 pb-2">
+        <div className="flex gap-1 overflow-x-auto pb-0.5 scrollbar-thin rounded-xl bg-white/50 p-1 border border-slate-200/60">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
+              className={`flex-shrink-0 rounded-lg px-3 py-2 text-xs font-bold transition-all ${
+                tab === t.id
+                  ? 'bg-[#0083C1] text-white shadow-md'
+                  : 'text-slate-600 hover:bg-white/80'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </nav>
+
+      <div className="flex-1 min-h-0 relative min-h-[120px]">
+        {loading && (
+          <div
+            className="absolute inset-0 z-20 flex flex-col items-center justify-center px-6 bg-white/75 backdrop-blur-[3px]"
+            aria-busy
+            aria-live="polite"
+          >
+            <div className="relative h-12 w-12">
+              <div
+                className="absolute inset-0 rounded-full opacity-25"
+                style={{ border: '3px solid #0083C1' }}
+              />
+              <div
+                className="absolute inset-0 rounded-full animate-spin"
+                style={{
+                  border: '3px solid transparent',
+                  borderTopColor: '#0083C1',
+                  borderRightColor: '#0083C1',
+                }}
+              />
             </div>
+            <p className="mt-4 text-sm font-semibold text-slate-700">Загрузка рекордов…</p>
+          </div>
+        )}
+
+        <div className="absolute inset-0 overflow-y-auto px-4 pb-6">
+          <div className="mb-4 rounded-2xl border border-slate-200/70 bg-white/90 shadow-sm overflow-hidden">
+            <div className="border-l-4 border-[#0083C1] px-4 py-3">
+              <h3 className="text-[15px] font-black text-slate-900 leading-snug">{activeTab.title}</h3>
+              <p className="text-sm text-slate-600 mt-1.5 leading-relaxed">{activeTab.description}</p>
+            </div>
+          </div>
+
+          {!uid && (
+            <p className="text-sm text-slate-700 mb-4 rounded-xl bg-amber-50/95 border border-amber-200/80 px-4 py-3 leading-relaxed">
+              Чтобы увидеть своё место в рейтинге, откройте игру из Telegram или по ссылке с параметром{' '}
+              <span className="font-mono text-xs">utm_medium</span> (числовой id).
+            </p>
           )}
 
           {err && (
-            <p className="text-red-700 text-sm rounded-xl bg-red-50 border border-red-200 px-3 py-2 mb-2">{err}</p>
+            <p className="text-red-800 text-sm rounded-xl bg-red-50 border border-red-200/90 px-4 py-3 mb-4">
+              {err}
+            </p>
           )}
 
           {data && cat && (
             <>
-            <div className="rounded-2xl bg-white/90 border border-slate-200/80 shadow-md overflow-hidden mb-3">
-              <div className="px-3 py-2 text-xs font-bold text-slate-500 uppercase tracking-wide border-b border-slate-100">
-                Топ‑10
-              </div>
-              {cat.top10.length === 0 ? (
-                <p className="px-3 py-4 text-sm text-slate-600">Пока нет данных для этого рейтинга.</p>
-              ) : (
-                <ul className="divide-y divide-slate-100">
-                  {cat.top10.map((row) => (
-                    <li key={`${tab}-${row.rank}-${row.uid}`} className="flex items-center gap-2 px-3 py-2 text-sm">
-                      <span className="w-7 font-black text-[#0083C1] tabular-nums">{row.rank}.</span>
-                      <span className="flex-1 min-w-0 truncate text-slate-800 font-semibold">{row.tgName}</span>
-                      <span className="font-mono text-slate-700 tabular-nums">{formatValue(tab, row.value)}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            <div className="rounded-2xl bg-white/90 border border-slate-200/80 shadow-md overflow-hidden mb-3">
-              <div className="px-3 py-2 text-xs font-bold text-slate-500 uppercase tracking-wide border-b border-slate-100">
-                Вы
-              </div>
-              <div className="px-3 py-3 text-sm space-y-1">
-                {!uid && <p className="text-slate-600">Идентификатор не задан — место не вычисляется.</p>}
-                {uid && me && (
-                  <>
-                    <p className="text-slate-800">
-                      <span className="font-semibold">{meLabel}</span>
-                      {me.rank != null ? (
-                        <>
-                          {' '}
-                          — место <span className="font-black text-[#0083C1]">{me.rank}</span> из{' '}
-                          {cat.playersTotal}
-                        </>
-                      ) : (
-                        <>
-                          {' '}
-                          — в таблице нет строк сессии с вашим id
-                        </>
-                      )}
-                    </p>
-                    <p className="font-mono text-slate-700">
-                      Значение: {formatValue(tab, me.value)}
-                    </p>
-                  </>
+              <section className="mb-4 rounded-2xl border border-slate-200/70 bg-white shadow-sm overflow-hidden">
+                <div className="px-4 py-2.5 bg-slate-50/80 border-b border-slate-100">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Топ‑10</span>
+                </div>
+                {cat.top10.length === 0 ? (
+                  <p className="px-4 py-8 text-center text-sm text-slate-500">Пока нет данных для этого рейтинга.</p>
+                ) : (
+                  <ul className="divide-y divide-slate-100">
+                    {cat.top10.map((row) => {
+                      return (
+                        <li
+                          key={`${tab}-${row.rank}-${row.uid}`}
+                          className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-slate-50/60 transition-colors"
+                        >
+                          <span
+                            className={`flex w-8 shrink-0 justify-end font-black tabular-nums ${
+                              row.rank <= 3 ? 'text-[#0083C1]' : 'text-slate-400'
+                            }`}
+                          >
+                            {row.rank}.
+                          </span>
+                          <span className="min-w-0 flex-1 truncate font-semibold text-slate-800">{row.tgName}</span>
+                          <span className="shrink-0 tabular-nums font-mono text-[13px] font-medium text-slate-600">
+                            {formatValue(tab, row.value)}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 )}
-              </div>
-            </div>
+              </section>
 
-            <div className="space-y-2 text-xs text-slate-600 leading-relaxed">
-              <p>
-                * <span className="font-semibold text-slate-800">Очки, симптомы и таблетки</span> — только по{' '}
-                <span className="font-semibold text-slate-800">завершённым</span> сессиям (после экрана со счётом), сумма
-                за всё время. <span className="font-semibold text-slate-800">Сессии и время</span> — по всем строкам учёта
-                с вашим id (включая незавершённые игры), накопительно.
-              </p>
-              {uid && me && <p>* {gapFootnote(tab, cat, localDisplayName)}</p>}
-            </div>
+              <section className="mb-4 rounded-2xl border border-[#0083C1]/25 bg-gradient-to-br from-white to-sky-50/50 shadow-sm overflow-hidden">
+                <div className="px-4 py-2.5 border-b border-sky-200/80 bg-sky-50/80">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-[#006299]">Вы</span>
+                </div>
+                <div className="px-4 py-4 text-sm space-y-2">
+                  {!uid && <p className="text-slate-600">Идентификатор не задан — место не вычисляется.</p>}
+                  {uid && me && (
+                    <>
+                      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                        <span className="font-semibold text-slate-900">{meLabel}</span>
+                        {me.rank != null ? (
+                          <span className="text-slate-600">
+                            место{' '}
+                            <span className="font-black text-[#0083C1] tabular-nums">{me.rank}</span>
+                            <span className="text-slate-400"> / </span>
+                            <span className="tabular-nums">{cat.playersTotal}</span>
+                          </span>
+                        ) : (
+                          <span className="text-slate-500">нет строк сессии с вашим id</span>
+                        )}
+                      </div>
+                      <p className="text-[13px] font-mono text-slate-700 tabular-nums">
+                        {formatValue(tab, me.value)}
+                      </p>
+                    </>
+                  )}
+                </div>
+              </section>
+
+              <footer className="space-y-2 rounded-xl border border-slate-200/60 bg-white/60 px-4 py-3 text-[11px] leading-relaxed text-slate-500">
+                <p>
+                  Очки, симптомы и таблетки — по <span className="font-semibold text-slate-700">завершённым</span>{' '}
+                  сессиям (итог на экране счёта). Сессии и время — по всем сессиям с вашим id.
+                </p>
+                {gapLine ? <p className="text-slate-600">{gapLine}</p> : null}
+              </footer>
             </>
           )}
         </div>
