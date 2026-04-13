@@ -8,6 +8,9 @@ import greenImage from './green.png';
 import redImage from './red.png';
 import targetImage from './target.png';
 
+/** Кнопка «Рекорды» на стартовом экране. Поставьте `true`, чтобы снова показать. */
+const SHOW_START_SCREEN_RECORDS_BUTTON = false;
+
 const App: React.FC = () => {
   const [isStarted, setIsStarted] = useState(false);
   const [showDisclaimer, setShowDisclaimer] = useState(false);
@@ -249,14 +252,16 @@ const App: React.FC = () => {
                   <span className="relative z-10">СТАРТ</span>
                 </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowRecords(true)}
-                className="w-full py-1.5 rounded-2xl font-black transition-all active:scale-95 border-2 border-[#0083C1] text-[#0083C1] bg-white/90 shadow-md"
-                style={{ fontFamily: "'Comic CAT', sans-serif", fontSize: '22px' }}
-              >
-                Рекорды
-              </button>
+              {SHOW_START_SCREEN_RECORDS_BUTTON ? (
+                <button
+                  type="button"
+                  onClick={() => setShowRecords(true)}
+                  className="w-full py-1.5 rounded-2xl font-black transition-all active:scale-95 border-2 border-[#0083C1] text-[#0083C1] bg-white/90 shadow-md"
+                  style={{ fontFamily: "'Comic CAT', sans-serif", fontSize: '22px' }}
+                >
+                  Рекорды
+                </button>
+              ) : null}
             </div>
 
             <div className="text-center">
@@ -272,14 +277,14 @@ const App: React.FC = () => {
           <GameContainer onExit={() => setIsStarted(false)} />
         )}
 
-        {!isStarted && !showDisclaimer && (
+        {!isStarted && !showDisclaimer && SHOW_START_SCREEN_RECORDS_BUTTON ? (
           <RecordsModal
             open={showRecords}
             onClose={() => setShowRecords(false)}
             uid={getResolvedTrackingUserId()}
             localDisplayName={getResolvedTgName()}
           />
-        )}
+        ) : null}
       </div>
     </div>
   );
