@@ -312,30 +312,30 @@ const App: React.FC = () => {
             }`}
             style={{ background: 'linear-gradient(180deg, #FFFFFF 0%, #75C4E6 100%)' }}
           >
-            <div className={`w-full max-w-md space-y-2 flex-shrink-0 ${disclaimerExiting ? '' : 'disclaimer-enter-stagger'}`}>
-              <div className="mb-2 start-title-exit">
+            <div className={`w-full max-w-md flex flex-col gap-2 flex-shrink-0 ${disclaimerExiting ? '' : 'disclaimer-enter-stagger'}`}>
+              <div className="mb-5 start-title-exit">
                 <GameTitle compact />
               </div>
 
-              <div className="space-y-2 screen-content-exit">
-                <label className="flex items-start gap-2 cursor-pointer select-none">
+              <div className="space-y-3 screen-content-exit">
+                <label className="flex items-start gap-3 cursor-pointer select-none">
                   <input
                     type="checkbox"
                     checked={checkbox1}
                     onChange={(e) => setCheckbox1(e.target.checked)}
-                    className="mt-0.5 w-4 h-4 min-w-[16px] min-h-[16px] flex-shrink-0 rounded border-slate-300 bg-white text-blue-600 focus:ring-blue-500 focus:ring-offset-0 accent-blue-500"
+                    className="mt-0.5 w-5 h-5 min-w-[20px] min-h-[20px] flex-shrink-0 rounded border-slate-300 bg-white text-blue-600 focus:ring-blue-500 focus:ring-offset-0 accent-blue-500"
                   />
                   <span className="text-slate-700 text-xs leading-snug">
                     Я ознакомился с информацией и понимаю, что игра носит исключительно развлекательный характер
                   </span>
                 </label>
                 
-                <label className="flex items-start gap-2 cursor-pointer select-none">
+                <label className="flex items-start gap-3 cursor-pointer select-none">
                   <input
                     type="checkbox"
                     checked={checkbox2}
                     onChange={(e) => setCheckbox2(e.target.checked)}
-                    className="mt-0.5 w-4 h-4 min-w-[16px] min-h-[16px] flex-shrink-0 rounded border-slate-300 bg-white text-blue-600 focus:ring-blue-500 focus:ring-offset-0 accent-blue-500"
+                    className="mt-0.5 w-5 h-5 min-w-[20px] min-h-[20px] flex-shrink-0 rounded border-slate-300 bg-white text-blue-600 focus:ring-blue-500 focus:ring-offset-0 accent-blue-500"
                   />
                   <span className="text-slate-700 text-xs leading-snug">
                     Я подтверждаю, что являюсь специалистом в сфере здравоохранения
@@ -343,7 +343,8 @@ const App: React.FC = () => {
                 </label>
               </div>
 
-              <div className={`relative w-full mb-3 start-button-exit ${canAccept ? 'group' : ''}`}>
+              <div className="flex flex-col gap-4">
+                <div className={`relative w-full start-button-exit ${canAccept ? 'group' : ''}`}>
                 {canAccept && (
                   <div className="absolute -inset-1 bg-blue-500 rounded-2xl blur opacity-25 group-hover:opacity-60 transition duration-1000" />
                 )}
@@ -484,6 +485,7 @@ const App: React.FC = () => {
                     <div className="w-10 flex-shrink-0" aria-hidden />
                   )}
                 </div>
+              </div>
               </div>
 
             </div>
