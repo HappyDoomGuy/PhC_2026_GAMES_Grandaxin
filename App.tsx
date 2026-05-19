@@ -446,8 +446,8 @@ const App: React.FC = () => {
                         onClick={() => goToDisclaimerPage(page as 0 | 1)}
                         aria-label={page === 0 ? 'Страница 1' : 'Страница 2'}
                         aria-current={disclaimerInfoPage === page ? 'page' : undefined}
-                        className={`h-1.5 rounded-full transition-all duration-300 ${
-                          disclaimerInfoPage === page ? 'w-5 bg-[#0083C1]' : 'w-1.5 bg-slate-300 hover:bg-slate-400'
+                        className={`h-2.5 rounded-full transition-all duration-300 ${
+                          disclaimerInfoPage === page ? 'w-8 bg-[#0083C1]' : 'w-2.5 bg-slate-300 hover:bg-slate-400'
                         }`}
                       />
                     ))}
