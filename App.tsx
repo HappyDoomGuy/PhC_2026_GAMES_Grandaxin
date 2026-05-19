@@ -11,9 +11,11 @@ import targetImage from './target.png';
 /** Кнопка «Рекорды» на стартовом экране. Поставьте `true`, чтобы снова показать. */
 const SHOW_START_SCREEN_RECORDS_BUTTON = false;
 
-const GameTitle: React.FC = () => (
+const GameTitle: React.FC<{ compact?: boolean }> = ({ compact = false }) => (
   <h1
-    className="text-[2.6rem] font-black tracking-tighter bg-clip-text text-transparent leading-tight overflow-visible text-center"
+    className={`font-black tracking-tighter bg-clip-text text-transparent leading-tight overflow-visible text-center ${
+      compact ? 'text-[1.65rem]' : 'text-[2.6rem]'
+    }`}
     style={{
       fontFamily: 'Inter, system-ui, sans-serif',
       backgroundImage: 'linear-gradient(to bottom, rgb(30, 41, 59), #0083C1)',
@@ -23,7 +25,10 @@ const GameTitle: React.FC = () => (
   >
     <span className="whitespace-nowrap">
       ГРАНДАКСИН
-      <span className="align-super text-3xl pl-0.5 pr-1" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+      <span
+        className={`align-super pl-0.5 pr-1 ${compact ? 'text-lg' : 'text-3xl'}`}
+        style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
+      >
         ®
       </span>
     </span>
@@ -298,7 +303,7 @@ const App: React.FC = () => {
         {/* Объединённый дисклеймер */}
         {(showDisclaimer || disclaimerExiting) && (
           <div 
-            className={`absolute inset-0 flex flex-col items-center justify-start p-4 pt-5 z-50 overflow-y-auto overflow-x-hidden ${
+            className={`absolute inset-0 flex flex-col items-center justify-start p-3 pt-4 z-50 overflow-y-auto overflow-x-hidden ${
               disclaimerExiting
                 ? 'screen-exit'
                 : disclaimerFromStart
@@ -307,9 +312,9 @@ const App: React.FC = () => {
             }`}
             style={{ background: 'linear-gradient(180deg, #FFFFFF 0%, #75C4E6 100%)' }}
           >
-            <div className={`w-full max-w-md space-y-3 flex-shrink-0 ${disclaimerExiting ? '' : 'disclaimer-enter-stagger'}`}>
-              <div className="mb-6 start-title-exit">
-                <GameTitle />
+            <div className={`w-full max-w-md space-y-2 flex-shrink-0 ${disclaimerExiting ? '' : 'disclaimer-enter-stagger'}`}>
+              <div className="mb-2 start-title-exit">
+                <GameTitle compact />
               </div>
 
               <div className="space-y-2 screen-content-exit">
@@ -338,14 +343,14 @@ const App: React.FC = () => {
                 </label>
               </div>
 
-              <div className={`relative w-full mb-6 start-button-exit ${canAccept ? 'group' : ''}`}>
+              <div className={`relative w-full mb-3 start-button-exit ${canAccept ? 'group' : ''}`}>
                 {canAccept && (
                   <div className="absolute -inset-1 bg-blue-500 rounded-2xl blur opacity-25 group-hover:opacity-60 transition duration-1000" />
                 )}
                 <button
                   onClick={handleDisclaimerAccept}
                   disabled={!canAccept || disclaimerExiting}
-                  className={`relative w-full py-3.5 rounded-xl font-black text-lg transition-all active:scale-95 overflow-hidden ${
+                  className={`relative w-full py-3 rounded-xl font-black text-base transition-all active:scale-95 overflow-hidden ${
                     canAccept 
                       ? 'attention-pulse text-white' 
                       : 'bg-slate-200/80 text-slate-500 cursor-not-allowed'
@@ -359,7 +364,7 @@ const App: React.FC = () => {
                 </button>
               </div>
 
-              <div className="bg-white/90 backdrop-blur-sm border border-slate-200/80 rounded-2xl p-4 shadow-lg shadow-slate-300/25 flex flex-col overflow-hidden screen-content-exit">
+              <div className="bg-white/90 backdrop-blur-sm border border-slate-200/80 rounded-2xl p-3 shadow-lg shadow-slate-300/25 flex flex-col overflow-hidden screen-content-exit">
                 <div className="disclaimer-flip-viewport overflow-hidden">
                   <div
                     className={`disclaimer-flip-book ${disclaimerInfoPage === 1 ? 'is-flipped' : ''}`}
@@ -371,9 +376,6 @@ const App: React.FC = () => {
                     <h2 className="text-base font-black text-slate-800 tracking-tight text-left uppercase">
                       Важная информация
                     </h2>
-                    <p className="font-semibold text-slate-800 text-xs leading-snug">
-                      Прежде чем начать, пожалуйста, внимательно ознакомьтесь с данной информацией:
-                    </p>
                     <p className="text-slate-700 text-xs leading-snug">
                       Игра-тапер «Грандаксин<span className="align-super" style={{ fontFamily: 'Inter, system-ui, sans-serif', fontSize: '0.5em' }}>®</span> может» является развлекательным приложением и создана исключительно в игровых и развлекательных целях.
                     </p>
